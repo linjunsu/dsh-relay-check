@@ -1,26 +1,22 @@
 {
-  "note": "DSH minimal 预设的首轮真实请求面。改动这里会让指纹失效。来源: dsh session request/header",
+  "note": "指纹夹具：DeepSeek Harness minimal 预设的首轮请求面。改动这里指纹即失效。",
+  "source": "deepseek-harness (MIT) — apps/cli/config/agent-presets/minimal/agent.cordis.yml, packages/shell/tool-bash-persistent, packages/fs/tool-str-replace-editor",
   "system": "You are a helpful software engineer assistant.",
   "tools": [
     {
       "name": "bash",
-      "description": "Run commands in a bash shell (Git Bash on Windows)\n* When invoking this tool, the contents of the \"command\" parameter does NOT need to be XML-escaped.\n* You don't have access to the internet via this tool.\n* You do have access to a mirror of common linux and python packages via apt and pip.\n* State does NOT persist across command calls: each call runs in a fresh shell.\n* To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.\n* Please avoid commands that may produce a very large amount of output.\n* NOTE: runs without OS sandbox confinement on Windows (no landlock); treat output as untrusted.",
+      "description": "Run commands in a bash shell\n* When invoking this tool, the contents of the \"command\" parameter does NOT need to be XML-escaped.\n* You don't have access to the internet via this tool.\n* You do have access to a mirror of common linux and python packages via apt and pip.\n* State is persistent across command calls and discussions with the user.\n* To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.\n* Please avoid commands that may produce a very large amount of output.\n* Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.",
       "parameters": {
         "type": "object",
         "properties": {
           "command": {
             "type": "string",
-            "description": "The bash command to execute (`bash -c` string domain)."
-          },
-          "workdir": {
-            "type": "string",
-            "description": "Optional working directory; defaults to the session cwd."
+            "description": "The bash command to run. Relative path is preferred in the command."
           }
         },
         "required": [
           "command"
-        ],
-        "additionalProperties": false
+        ]
       }
     },
     {
@@ -31,13 +27,13 @@
         "properties": {
           "command": {
             "type": "string",
-            "description": "The commands to run. Allowed options are: `view`, `create`, `str_replace`, `insert`.",
             "enum": [
               "view",
               "create",
               "str_replace",
               "insert"
-            ]
+            ],
+            "description": "The commands to run. Allowed options are: `view`, `create`, `str_replace`, `insert`."
           },
           "path": {
             "type": "string",
@@ -61,10 +57,10 @@
           },
           "view_range": {
             "type": "array",
-            "description": "Optional parameter of `view` command when `path` points to a file. If none is given, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file.",
             "items": {
               "type": "integer"
-            }
+            },
+            "description": "Optional parameter of `view` command when `path` points to a file. If none is given, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file."
           }
         },
         "required": [
