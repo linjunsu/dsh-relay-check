@@ -33,6 +33,8 @@ Let me start by exploring the repository structure.
 npm run ui          # 或 node bin/serve.mjs
 ```
 
+Windows 直接双击 `start.bat` 也行：会自动挑端口状态、起服务、等端口通了再开浏览器。
+
 打开 <http://127.0.0.1:8787>，填四样东西就能测：**Base URL / 模型 ID / 协议 / API Key**。
 想对比就点「再加一个一起对比」，多个目标一起跑，跑完出汇总表。
 
