@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DeepSeek 中转满血检测</title>
+<style>
+  /* 色板取自 dataviz 参考实例（暖中性表面 + 固定状态色），
+     所有文字/徽章对比度已用 WCAG 脚本逐一验过：
+       徽章文字 ≥5.38:1 · 主墨 19.2:1 · 次墨 7.7:1 · 弱墨 3.5:1 · 主按钮白字 5.39:1
+     规范要点：文字穿文字色，状态色只做填充与徽章；状态永远「图标+文字」，不靠颜色单独表意。 */
+  :root{
+    --plane:#f9f9f7;        /* 页面平面 */
+    --card:#fcfcfb;         /* 卡面 */
+    --ink:#0b0b0b;          /* 主墨 */
+    --ink2:#52514e;         /* 次墨 */
+    --ink3:#898781;         /* 弱墨（轴/标签） */
+    --rule:#e1e0d9;         /* 发丝线 */
+    --ring:rgba(11,11,11,.10);
+    --accent:#256abf;       /* 蓝序列 step500，白字 5.39:1 */
+    --accent-l:#2a78d6;
+    --accent-wash:rgba(37,106,191,.06);
+
+    --good:#0ca30c;   --good-ink:#006300;  --good-bg:#e6f4e6;  --good-track:#f0faf0;
+    --warn:#fab219;   --warn-ink:#8a5a00;  --warn-bg:#fdf3e0;  --warn-track:#fef8ec;
+    --crit:#d03b3b;   --crit-ink:#a82626;  --crit-bg:#fbebec;  --crit-track:#fdf2f2;
+    --gray:#7b8494;   --gray-ink:#52514e;  --gray-bg:#f0efec;  --gray-track:#f6f5f2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--plane);color:var(--ink);
+    font:15px/1.6 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
+  code{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:.88em;
+    background:#f0efec;padding:2px 7px;border-radius:5px;color:#33415c;white-space:nowrap}
+
+  .wrap{max-width:1320px;margin:0 auto;padding:56px 44px 120px}
+
+  /* ── 页头 ── */
+  header{margin-bottom:38px;max-width:860px}
+  h1{font-size:34px;font-weight:700;letter-spacing:-.025em;margin:0 0 12px;line-height:1.2}
+  .lede{color:var(--ink2);font-size:15.5px;line-height:1.72}
+  .lede b{color:var(--ink);font-weight:600}
+
+  /* ── 卡片 ── */
+  .card{background:var(--card);border:1px solid var(--ring);border-radius:16px;
+    box-shadow:0 1px 2px rgba(11,11,11,.03),0 12px 32px -12px rgba(11,11,11,.08);
+    overflow:hidden}
+  .card+.card{margin-top:20px}
+  .pad{padding:28px 30px}
+  .cap{display:flex;align-items:baseline;gap:12px;margin:0 0 20px}
+  .cap h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink3);font-weight:700;margin:0}
+  .cap .of{color:var(--ink3);font-size:13px}
+
+  /* ── 表单 ── */
+  label{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:8px;font-weight:500}
+  input,select{width:100%;background:#fff;border:1px solid #dcdbd4;color:var(--ink);
+    border-radius:10px;padding:12px 14px;font:inherit;font-size:14.5px;
+    transition:border-color .13s,box-shadow .13s}
+  input:hover:not(:focus),select:hover:not(:focus){border-color:#c9c8c0}
+  input:focus,select:focus{outline:none;border-color:var(--accent-l);
+    box-shadow:0 0 0 3.5px rgba(42,120,214,.15)}
+  input::placeholder{color:#b3b1a9}
+  select{cursor:pointer;appearance:none;padding-right:36px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12'><path d='M2.5 4.5L6 8l3.5-3.5' fill='none' stroke='%23898781' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 14px center}
+
+  button{background:#fff;border:1px solid #dcdbd4;color:var(--ink);border-radius:10px;
+    padding:11px 18px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:.13s}
+  button:hover:not(:disabled){border-color:#b9b8b0;background:#fafaf8}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;
+    font-size:15.5px;padding:14px 38px;letter-spacing:.01em;
+    box-shadow:0 1px 2px rgba(37,106,191,.28),0 8px 20px -6px rgba(37,106,191,.42)}
+  .primary:hover:not(:disabled){background:#1c5cab;border-color:#1c5cab}
+  .ghost{width:100%;background:transparent;border:1px dashed #d3d2ca;color:var(--ink2);padding:13px}
+  .ghost:hover{color:var(--accent);border-color:var(--accent-l);background:var(--accent-wash)}
+
+  .grid{display:grid;
+    grid-template-columns:minmax(230px,2.1fr) minmax(150px,1.25fr) 148px minmax(200px,1.7fr) 42px;
+    gap:14px;align-items:end}
+  .grid+.grid{margin-top:16px;padding-top:20px;border-top:1px solid var(--rule)}
+  @media(max-width:1020px){.grid{grid-template-columns:1fr 1fr}.grid .del{justify-self:end}}
+  .del{border:none;background:transparent;color:#b3b1a9;font-size:17px;padding:12px 9px;border-radius:9px}
+  .del:hover{color:var(--crit-ink);background:var(--crit-bg)}
+
+  .params{display:flex;gap:22px;flex-wrap:wrap;align-items:end}
+  .go{display:flex;align-items:center;gap:18px;margin-top:26px;
+    padding-top:24px;border-top:1px solid var(--rule)}
+  .tip{color:var(--ink3);font-size:13.5px;margin-left:auto;text-align:right}
+  .tip.err{color:var(--crit-ink)}
+
+  /* ── 结果卡 ── */
+  .rhead{display:flex;align-items:center;gap:18px;padding:22px 30px}
+  .rhead .m{font-size:18px;font-weight:650;letter-spacing:-.015em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rhead .b{color:var(--ink3);font-size:13px;margin-top:2px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rhead .who{min-width:0;flex:1}
+
+  .chip{display:inline-flex;align-items:center;gap:7px;padding:8px 17px;border-radius:999px;
+    font-size:14.5px;font-weight:700;white-space:nowrap;flex:none}
+  .chip .ic{font-size:15px;line-height:1}
+  .c-ok{background:var(--good-bg);color:var(--good-ink)}
+  .c-warn{background:var(--warn-bg);color:var(--warn-ink)}
+  .c-crit{background:var(--crit-bg);color:var(--crit-ink)}
+  .c-gray{background:var(--gray-bg);color:var(--gray-ink)}
+  .chip.pend{background:var(--gray-bg);color:var(--gray-ink);font-weight:600}
+  .chip.pend .ic{animation:pulse 1.1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+  /* 英雄数字 + 计量条 + 逐次点阵 */
+  .metrics{display:flex;align-items:center;gap:40px;flex-wrap:wrap;
+    padding:24px 30px;background:#fafaf8;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+  .hero{flex:none;min-width:190px}
+  .hero .n{font-size:52px;font-weight:700;letter-spacing:-.035em;line-height:1.02;color:var(--ink)}
+  .hero .n .u{font-size:26px;font-weight:600;color:var(--ink3);margin-left:2px}
+  .hero .cap2{font-size:12.5px;color:var(--ink2);margin-top:6px}
+  .meter{width:100%;height:9px;border-radius:99px;overflow:hidden;margin-top:11px}
+  .meter i{display:block;height:100%;border-radius:99px;width:0;transition:width .45s cubic-bezier(.4,0,.2,1)}
+  .k-ok .meter{background:var(--good-track)}   .k-ok .meter i{background:var(--good)}
+  .k-warn .meter{background:var(--warn-track)} .k-warn .meter i{background:var(--warn)}
+  .k-crit .meter{background:var(--crit-track)} .k-crit .meter i{background:var(--crit)}
+  .k-gray .meter{background:var(--gray-track)} .k-gray .meter i{background:var(--gray)}
+
+  .dots{display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:none}
+  .dot{width:14px;height:14px;border-radius:5px;background:var(--gray-bg);
+    box-shadow:inset 0 0 0 1px rgba(11,11,11,.06);transition:background .2s}
+  .dot.ok{background:var(--good)} .dot.weak{background:var(--warn)}
+  .dot.no{background:#d8d7d0} .dot.err{background:var(--crit)}
+  .dotwrap .cap2{font-size:12.5px;color:var(--ink2);margin-top:9px}
+
+  .tiles{display:flex;gap:34px;flex-wrap:wrap;margin-left:auto}
+  .tile .k{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+  .tile .v{font-size:21px;font-weight:650;letter-spacing:-.02em;margin-top:3px}
+  .tile .v small{font-size:13px;font-weight:500;color:var(--ink3);margin-left:2px}
+
+  .samples{padding:6px 30px 22px}
+  .samp{display:flex;gap:14px;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--rule);
+    animation:fade .3s ease-out}
+  .samp:last-child{border-bottom:none}
+  @keyframes fade{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+  .mk{flex:0 0 62px;font-size:11px;font-weight:700;letter-spacing:.04em;text-align:center;
+    padding:3px 0;border-radius:6px}
+  .mk-ok{background:var(--good-bg);color:var(--good-ink)}
+  .mk-weak{background:var(--warn-bg);color:var(--warn-ink)}
+  .mk-no{background:var(--gray-bg);color:var(--gray-ink)}
+  .mk-err{background:var(--crit-bg);color:var(--crit-ink)}
+  .txt{flex:1;min-width:0;color:var(--ink2);font-size:13px;line-height:1.62;
+    white-space:pre-wrap;word-break:break-word}
+  .txt.hit{color:var(--ink)}
+  .note{padding:0 30px 22px;color:var(--ink2);font-size:13.5px}
+
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:14px;border-bottom:1px solid var(--rule);font-size:14px}
+  th{color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+  tbody tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums}   /* 列对齐才用等宽数字 */
+  .sub{color:var(--ink3);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>DeepSeek 中转满血检测</h1>
+    <div class="lede">
+      用 DSH <b>minimal</b> 预设的首轮请求面打指纹。官方模型写的是
+      <code>We need inspect repo. Need find…</code>——<b>need 后面直接跟动词，省掉 to</b>；
+      降级或套壳的只会写 <code>The user wants me to… Let me…</code>。
+      支持 OpenAI / Anthropic / Responses 三种协议，可自动识别。
+    </div>
+  </header>
+
+  <div class="card"><div class="pad">
+    <div class="cap"><h2>要测什么</h2><span class="of" id="count"></span></div>
+    <div id="rows"></div>
+    <div style="margin-top:20px"><button class="ghost" id="add">＋ 再加一个一起对比</button></div>
+  </div></div>
+
+  <div class="card"><div class="pad">
+    <div class="cap"><h2>参数</h2></div>
+    <div class="params">
+      <div style="width:132px"><label>每个目标跑几次</label>
+        <input id="runs" type="number" min="1" max="30" value="6"></div>
+      <div style="width:236px"><label>探针语言</label>
+        <select id="lang">
+          <option value="en">英文 — 命中率高，推荐</option>
+          <option value="zh">中文 — 天然偏低，仅参考</option>
+        </select></div>
+      <div style="width:172px"><label>思考强度</label>
+        <select id="effort"><option>max</option><option>high</option><option>medium</option><option>low</option></select></div>
+    </div>
+    <div class="go">
+      <button class="primary" id="run">开始检测</button>
+      <button id="stop" style="display:none">停止</button>
+      <span class="tip" id="tip">建议把官方端点也加一行当基准，对比最直观</span>
+    </div>
+  </div></div>
+
+  <div id="results"></div>
+
+  <div class="card" id="sumCard" style="display:none"><div class="pad">
+    <div class="cap"><h2>汇总</h2></div>
+    <table><thead><tr>
+      <th>目标</th><th>协议</th><th>强命中</th><th>弱信号</th>
+      <th>reasoning</th><th>prompt</th><th>延迟</th><th>判定</th>
+    </tr></thead><tbody id="sumBody"></tbody></table>
+  </div></div>
+
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const PROTOS = [['auto','自动识别'],['openai','OpenAI'],['anthropic','Anthropic'],['responses','Responses']];
+
+// 判定 → 徽章样式 + 图标。状态永远「图标 + 文字」，不靠颜色单独表意。
+const KIND = {
+  '满血':     { cls:'ok',   chip:'c-ok',   ic:'✓' },
+  '野鸡':     { cls:'crit', chip:'c-crit', ic:'✗' },
+  '可疑':     { cls:'warn', chip:'c-warn', ic:'!' },
+  '无法判定': { cls:'gray', chip:'c-gray', ic:'?' },
+  '打不通':   { cls:'gray', chip:'c-gray', ic:'—' },
+};
+const kindOf = t => KIND[t] || KIND['打不通'];
+
+let rows = [{ base:'', model:'', protocol:'auto', key:'' }];
+let abort = null;
+
+function renderRows() {
+  $('#count').textContent = rows.length > 1 ? rows.length + ' 个目标' : '';
+  $('#rows').innerHTML = rows.map((r, i) => {
+    const opts = PROTOS.map(([v,t]) =>
+      '<option value="'+v+'"'+(r.protocol===v?' selected':'')+'>'+t+'</option>').join('');
+    return '<div class="grid">'+
+      '<div><label>Base URL</label><input data-i="'+i+'" data-k="base" value="'+esc(r.base)+
+        '" placeholder="https://api.deepseek.com" spellcheck="false"></div>'+
+      '<div><label>模型 ID</label><input data-i="'+i+'" data-k="model" value="'+esc(r.model)+
+        '" placeholder="deepseek-v4-flash" spellcheck="false"></div>'+
+      '<div><label>协议</label><select data-i="'+i+'" data-k="protocol">'+opts+'</select></div>'+
+      '<div><label>API Key</label><input data-i="'+i+'" data-k="key" type="password" value="'+esc(r.key)+
+        '" placeholder="sk-…" spellcheck="false" autocomplete="off"></div>'+
+      '<button class="del" data-del="'+i+'" title="删除"'+(rows.length===1?' style="visibility:hidden"':'')+'>✕</button>'+
+      '</div>';
+  }).join('');
+}
+
+$('#rows').addEventListener('input', e => {
+  const i = +e.target.dataset.i;
+  if (!Number.isNaN(i)) rows[i][e.target.dataset.k] = e.target.value;
+});
+$('#rows').addEventListener('change', e => {
+  const i = +e.target.dataset.i;
+  if (!Number.isNaN(i) && e.target.dataset.k === 'protocol') rows[i].protocol = e.target.value;
+});
+$('#rows').addEventListener('click', e => {
+  const b = e.target.closest('[data-del]');
+  if (!b) return;
+  rows.splice(+b.dataset.del, 1);
+  if (rows.length === 0) rows.push({ base:'', model:'', protocol:'auto', key:'' });
+  renderRows();
+});
+$('#add').onclick = () => {
+  const last = rows[rows.length-1] || {};
+  // 多半是同一家换模型或换协议口，带上 base/key 省得重输
+  rows.push({ base:last.base||'', model:'', protocol:'auto', key:last.key||'' });
+  renderRows();
+  const ms = $('#rows').querySelectorAll('input[data-k="model"]');
+  ms[ms.length-1].focus();
+};
+
+// ── 结果 ──────────────────────────────────────────────────────────────────
+const done = [];
+const cid = i => 'r' + i;
+
+function startCard(i, model, base, runs) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.id = cid(i);
+  el.innerHTML =
+    '<div class="rhead"><div class="who"><div class="m">'+esc(model)+'</div>'+
+      '<div class="b">'+esc(base)+'</div></div>'+
+      '<span class="chip pend" data-chip><span class="ic">●</span>检测中</span></div>'+
+    '<div class="metrics k-gray" data-metrics>'+
+      '<div class="hero"><div class="n" data-hero>—</div>'+
+        '<div class="cap2" data-cap>准备中…</div><div class="meter"><i data-meter></i></div></div>'+
+      '<div class="dotwrap"><div class="dots" data-dots>'+
+        Array.from({length:runs},()=>'<span class="dot"></span>').join('')+
+      '</div><div class="cap2">逐次结果</div></div>'+
+      '<div class="tiles" data-tiles></div>'+
+    '</div>'+
+    '<div class="samples" data-samples></div>'+
+    '<div class="note" data-note style="display:none"></div>';
+  $('#results').appendChild(el);
+  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function addSample(i, s, runs) {
+  const card = document.getElementById(cid(i));
+  if (!card) return;
+  let cls='no', word='未命中';
+  if (s.error) { cls='err'; word='错误'; }
+  else if (s.hit) { cls='ok'; word='满血'; }
+  else if (s.weak) { cls='weak'; word='弱信号'; }
+
+  const box = card.querySelector('[data-samples]');
+  const n = box.children.length;
+  const row = document.createElement('div');
+  row.className = 'samp';
+  row.innerHTML = '<span class="mk mk-'+cls+'">'+word+'</span>'+
+    '<span class="txt mono'+(s.hit?' hit':'')+'">'+
+      esc(s.error ? s.error : (s.reasoning || '（没有返回思维链）')).slice(0,600)+'</span>';
+  box.appendChild(row);
+
+  const dots = card.querySelectorAll('[data-dots] .dot');
+  if (dots[n]) dots[n].className = 'dot ' + cls;
+
+  // 边跑边把命中率顶上去，不用等全部结束
+  const all = [...box.children];
+  const hits = all.filter(r => r.querySelector('.mk-ok')).length;
+  const judged = all.filter(r => !r.querySelector('.mk-err')).length;
+  const pct = judged ? Math.round(hits/judged*100) : 0;
+  card.querySelector('[data-hero]').innerHTML = judged ? pct+'<span class="u">%</span>' : '—';
+  card.querySelector('[data-cap]').textContent = '强命中 '+hits+'/'+judged+'（共 '+runs+' 次）';
+  card.querySelector('[data-meter]').style.width = (all.length/runs*100)+'%';
+}
+
+function finishCard(i, r) {
+  const card = document.getElementById(cid(i));
+  if (!card) return;
+  const v = r.verdict || { tag:'打不通', mark:'!', note:r.error||'' };
+  const k = kindOf(v.tag);
+
+  const chip = card.querySelector('[data-chip]');
+  chip.className = 'chip ' + k.chip;
+  chip.innerHTML = '<span class="ic">'+k.ic+'</span>'+esc(v.tag);
+
+  const met = card.querySelector('[data-metrics]');
+  met.className = 'metrics k-' + k.cls;
+
+  const notes = [];
+  if (v.note) notes.push(v.note);
+  if (r.skipped > 0) notes.push('连续失败，已跳过剩下 '+r.skipped+' 次');
+  if (r.noReasoning > 0) notes.push('有 '+r.noReasoning+' 次没返回思维链');
+  if (r.redacted > 0) notes.push('有 '+r.redacted+' 次思维链被加密');
+  if (notes.length) {
+    const n = card.querySelector('[data-note]');
+    n.style.display=''; n.textContent = notes.join('；');
+  }
+
+  if (r.error) {
+    card.querySelector('[data-hero]').textContent = '—';
+    card.querySelector('[data-cap]').textContent = '没跑起来';
+    card.querySelector('[data-meter]').style.width = '0';
+    return;
+  }
+
+  const pct = r.rate == null ? null : Math.round(r.rate*100);
+  card.querySelector('[data-hero]').innerHTML = pct == null ? '—' : pct+'<span class="u">%</span>';
+  card.querySelector('[data-cap]').textContent =
+    (r.rate == null ? '拿不到思维链' : '强命中 '+r.hits+'/'+r.judged) + (r.weak ? ' · 弱信号 '+r.weak : '');
+  card.querySelector('[data-meter]').style.width = (pct == null ? 0 : pct) + '%';
+
+  const tile = (k2,v2,u) => '<div class="tile"><div class="k">'+k2+'</div><div class="v">'+v2+
+    (u?'<small>'+u+'</small>':'')+'</div></div>';
+  card.querySelector('[data-tiles]').innerHTML =
+    tile('reasoning', r.avgReasoningTokens == null ? '—' : r.avgReasoningTokens) +
+    tile('prompt', r.avgPromptTokens == null ? '—' : r.avgPromptTokens) +
+    tile('平均延迟', r.avgMs == null ? '—' : r.avgMs, ' ms') +
+    tile('协议', esc(r.protocol || '—'));
+}
+
+function renderSummary() {
+  if (done.length < 2) return;
+  $('#sumCard').style.display = '';
+  $('#sumBody').innerHTML = done.map(r => {
+    const v = r.verdict || { tag:'打不通' };
+    const k = kindOf(v.tag);
+    const rate = (r.error || r.rate == null) ? '—'
+      : '<b>'+Math.round(r.rate*100)+'%</b> <span class="sub">'+r.hits+'/'+r.judged+'</span>';
+    return '<tr>'+
+      '<td><b>'+esc(r.target.model||'')+'</b><br><span class="sub">'+esc(r.target.base||'')+'</span></td>'+
+      '<td class="mono">'+esc(r.protocol||'—')+'</td>'+
+      '<td class="num">'+rate+'</td>'+
+      '<td class="num">'+(r.weak == null ? '—' : r.weak)+'</td>'+
+      '<td class="num">'+(r.avgReasoningTokens == null ? '—' : r.avgReasoningTokens)+'</td>'+
+      '<td class="num">'+(r.avgPromptTokens == null ? '—' : r.avgPromptTokens)+'</td>'+
+      '<td class="num">'+(r.avgMs == null ? '—' : r.avgMs+' ms')+'</td>'+
+      '<td><span class="chip '+k.chip+'"><span class="ic">'+k.ic+'</span>'+esc(v.tag)+'</span></td>'+
+      '</tr>';
+  }).join('');
+}
+
+// ── 跑 ────────────────────────────────────────────────────────────────────
+// SSE 推进度。用 fetch 不用 EventSource：后者只能 GET，key 就得进 URL 和浏览器历史。
+async function runAll() {
+  const list = rows.map(r => ({
+    base:(r.base||'').trim(), model:(r.model||'').trim(),
+    key:(r.key||'').trim(), protocol:r.protocol||'auto',
+  })).filter(r => r.base !== '' && r.model !== '');
+
+  const tip = $('#tip');
+  if (list.length === 0) { tip.className='tip err'; tip.textContent='至少填一个 Base URL 和模型 ID'; return; }
+  const miss = list.find(r => r.key === '');
+  if (miss) { tip.className='tip err'; tip.textContent='「'+miss.model+'」还没填 Key'; return; }
+  tip.className='tip'; tip.textContent='';
+
+  list.forEach(r => { r.label = r.model; });
+  const runs = Math.max(1, +$('#runs').value || 6);
+
+  $('#results').innerHTML=''; $('#sumCard').style.display='none'; done.length=0;
+  $('#run').disabled=true; $('#stop').style.display='';
+  abort = new AbortController();
+
+  let res;
+  try {
+    res = await fetch('/api/check', {
+      method:'POST', headers:{'content-type':'application/json'}, signal:abort.signal,
+      body: JSON.stringify({ targets:list, runs, lang:$('#lang').value, effort:$('#effort').value }),
+    });
+  } catch (e) {
+    tip.className='tip err'; tip.textContent='请求失败：'+e.message;
+    $('#run').disabled=false; $('#stop').style.display='none';
+    return;
+  }
+
+  const reader = res.body.getReader(), dec = new TextDecoder();
+  let buf = '';
+  try {
+    for (;;) {
+      const { value, done:fin } = await reader.read();
+      if (fin) break;
+      buf += dec.decode(value, { stream:true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {         // SSE 事件以空行分隔
+        const chunk = buf.slice(0, idx); buf = buf.slice(idx+2);
+        const ev = /event: (.+)/.exec(chunk), da = /data: (.+)/.exec(chunk);
+        if (!ev || !da) continue;
+        const name = ev[1].trim(), d = JSON.parse(da[1]);
+        if (name === 'target-start') {
+          const t = list[d.index] || {};
+          startCard(d.index, t.model || d.label, t.base || '', runs);
+        } else if (name === 'sample') addSample(d.index, d, runs);
+        else if (name === 'target-done') { done.push(d.result); finishCard(d.index, d.result); }
+        else if (name === 'all-done') renderSummary();
+      }
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') { tip.className='tip err'; tip.textContent='中断：'+e.message; }
+  }
+  $('#run').disabled=false; $('#stop').style.display='none';
+  renderSummary();
+}
+
+$('#run').onclick = runAll;
+$('#stop').onclick = () => abort && abort.abort();
+
+renderRows();
+</script>
+</body>
+</html>

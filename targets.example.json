@@ -1,0 +1,21 @@
+[
+  {
+    "label": "官方 flash（基准）",
+    "base": "https://api.deepseek.com",
+    "model": "deepseek-v4-flash",
+    "keyEnv": "DEEPSEEK_API_KEY"
+  },
+  {
+    "label": "某中转 flash",
+    "base": "https://example-relay.com/v1",
+    "model": "deepseek-v4-flash",
+    "keyEnv": "RELAY_API_KEY"
+  },
+  {
+    "label": "某中转 anthropic 口",
+    "base": "https://example-relay.com/api/anthropic",
+    "model": "DeepSeek-V4-Flash",
+    "key": "sk-inline-key-also-works",
+    "protocol": "anthropic"
+  }
+]
