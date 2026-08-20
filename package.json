@@ -1,7 +1,6 @@
 {
   "name": "dsh-relay-check",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "description": "检测中转站提供的 DeepSeek API 是满血还是野鸡，支持 OpenAI / Anthropic / Responses 三种协议",
   "bin": {
@@ -28,5 +27,16 @@
     "model-verification",
     "fingerprint",
     "中转站"
-  ]
+  ],
+  "files": [
+    "bin",
+    "src",
+    "web",
+    "README.md",
+    "LICENSE"
+  ],
+  "bugs": {
+    "url": "https://github.com/linjunsu/dsh-relay-check/issues"
+  },
+  "homepage": "https://github.com/linjunsu/dsh-relay-check#readme"
 }
