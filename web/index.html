@@ -458,6 +458,72 @@ $('#run').onclick = runAll;
 $('#stop').onclick = () => abort && abort.abort();
 
 renderRows();
+
+// ── 演示模式 ────────────────────────────────────────────────────────────────
+// ?demo=1 用匿名示例数据渲染三种判定，不发任何网络请求。
+// 用途：截图、预览、没有 Key 的人先看看长什么样——也免得截图时把真实
+// 中转站域名和自己的 Key 一起漏出去。
+const DEMO = [
+  {
+    model: 'deepseek-v4-flash', base: 'https://api.deepseek.com（官方基准）',
+    protocol: 'openai', protocolLabel: 'OpenAI Chat Completions',
+    hits: 6, judged: 6, weak: 0, rate: 1, noReasoning: 0, redacted: 0,
+    avgReasoningTokens: 19, avgPromptTokens: 1169, avgMs: 1094,
+    verdict: { tag: '满血', mark: '✓', note: '' },
+    samples: [
+      "We need inspect repo. Need find circular dependencies. Need list any. Let's start.",
+      "We need inspect repository. Need understand project. We'll list files.",
+      'We need inspect repo. Need check circular dependencies. Need use tools.',
+      "We need inspect repo. Need find circular dependencies. Let's list files.",
+      'We need examine repository for circular dependencies. Need figure out repo.',
+      "We need inspect repo. Need identify circular dependencies. Let's explore.",
+    ].map(t => ({ hit: true, weak: false, reasoning: t })),
+  },
+  {
+    model: 'deepseek-v4-flash', base: 'https://中转A.example/v1（低价 SKU）',
+    protocol: 'openai', protocolLabel: 'OpenAI Chat Completions',
+    hits: 0, judged: 6, weak: 0, rate: 0, noReasoning: 0, redacted: 0,
+    avgReasoningTokens: 34, avgPromptTokens: 1156, avgMs: 2846,
+    verdict: { tag: '野鸡', mark: '✗', note: '零命中，语域与官方不一致' },
+    samples: [
+      'The user wants me to check a repository for circular dependencies. Let me first explore the repository structure.',
+      'Let me start by exploring the repository structure to understand what we are dealing with.',
+      'The user wants me to check a repository for circular dependencies. Let me first explore.',
+      'I need to check the repository for circular dependencies. Let me first explore the repository.',
+      'The user wants me to check if there are circular dependencies. Let me start by exploring.',
+      'Let me start by exploring the repository structure.',
+    ].map(t => ({ hit: false, weak: false, reasoning: t })),
+  },
+  {
+    model: 'DeepSeek-V4-Flash', base: 'https://中转B.example/api/anthropic',
+    protocol: 'anthropic', protocolLabel: 'Anthropic Messages',
+    hits: 1, judged: 6, weak: 1, rate: 1 / 6, noReasoning: 0, redacted: 0,
+    avgReasoningTokens: null, avgPromptTokens: 1109, avgMs: 3444,
+    verdict: { tag: '可疑', mark: '!', note: '部分命中，建议加大 --runs 复测' },
+    samples: [
+      { hit: false, weak: false, reasoning: 'Let me explore the repository to understand its structure.' },
+      { hit: false, weak: true, reasoning: "We need to inspect repository for circular dependencies. Let's look at files." },
+      { hit: false, weak: false, reasoning: 'Let me start by exploring the repository structure.' },
+      { hit: true, weak: false, reasoning: "We need inspect repo. Need find circular dependencies. Let's start." },
+      { hit: false, weak: false, reasoning: 'Let me explore the repository to understand its structure.' },
+      { hit: false, weak: false, reasoning: 'The user wants me to check the repository for circular dependencies.' },
+    ],
+  },
+];
+
+if (/[?&]demo\b/.test(location.search)) {
+  rows = DEMO.map(d => ({ base: d.base, model: d.model, protocol: d.protocol, key: 'sk-demo' }));
+  renderRows();
+  $('#tip').textContent = '演示模式：以下为示例数据，未发出任何请求';
+  DEMO.forEach((d, i) => {
+    startCard(i, d.model, d.base, d.samples.length);
+    d.samples.forEach(s => addSample(i, s, d.samples.length));
+    const r = { ...d, target: { model: d.model, base: d.base } };
+    done.push(r);
+    finishCard(i, r);
+  });
+  renderSummary();
+}
 </script>
 </body>
 </html>
