@@ -82,6 +82,12 @@
     gap:14px;align-items:end}
   .grid+.grid{margin-top:16px;padding-top:20px;border-top:1px solid var(--rule)}
   @media(max-width:1020px){.grid{grid-template-columns:1fr 1fr}.grid .del{justify-self:end}}
+  /* 演示/截图模式：关掉过渡与入场动画。无头浏览器的抓图时机和 CSS transition
+     会打架——计量条时而满、时而空。这里把不确定性直接消掉。 */
+  body.demo .meter i,body.demo .dot{transition:none}
+  body.demo .samp{animation:none}
+  body.demo .chip.pend .ic{animation:none}
+
   .del{border:none;background:transparent;color:#b3b1a9;font-size:17px;padding:12px 9px;border-radius:9px}
   .del:hover{color:var(--crit-ink);background:var(--crit-bg)}
 
@@ -512,6 +518,7 @@ const DEMO = [
 ];
 
 if (/[?&]demo\b/.test(location.search)) {
+  document.body.classList.add('demo')
   rows = DEMO.map(d => ({ base: d.base, model: d.model, protocol: d.protocol, key: 'sk-demo' }));
   renderRows();
   $('#tip').textContent = '演示模式：以下为示例数据，未发出任何请求';
@@ -523,6 +530,8 @@ if (/[?&]demo\b/.test(location.search)) {
     finishCard(i, r);
   });
   renderSummary();
+  // startCard 会 scrollIntoView，渲染完页面已经滚到底了；演示/截图要从头看起。
+  window.scrollTo(0, 0)
 }
 </script>
 </body>

@@ -8,9 +8,9 @@
 > downgraded / rebadged one. Behavioral fingerprinting via DeepSeek Harness's
 > `minimal` preset. Node.js, zero dependencies, MIT.
 
-<!-- 截图放这里：把 UI 跑一遍的截图存成 docs/screenshot.png 就会显示
-![界面](docs/screenshot.png)
--->
+![界面：同一个工具，官方端点 100% 满血，某中转低价 SKU 0% 野鸡](docs/screenshot.png)
+
+<sub>截图为演示模式（`?demo=1`）的示例数据。改了界面后跑 `node docs/shoot.mjs` 可重新生成。</sub>
 
 ---
 
