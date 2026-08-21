@@ -179,6 +179,14 @@ Windows 直接双击 **`start.bat`**：自动判断端口状态、起服务、�
 - **概率性判据。** `--runs` 越大越稳，判「可疑」时务必加大样本复测。
 - **指纹随模型版本变化。** DeepSeek 换代后需要用官方端点重新校准 `src/detect.mjs` 里的判据。
 
+## 端点是真的，然后呢
+
+确认端点没被换成蒸馏版或量化版之后，下一步是**怎么构造请求才能把这个满血模型的性能榨出来**——
+同样的权重，请求面不同，输出质量差别很大。
+
+规格在这儿：**[dsh-peak-call](https://github.com/linjunsu/dsh-peak-call)**（只有规则，没有代码，
+可以直接丢给别的开发者或其 AI agent）。
+
 ## 和 veridrop 的关系
 
 [canarybyte/veridrop](https://github.com/canarybyte/veridrop) 是同领域更全面的项目，覆盖 Claude / OpenAI / Gemini，
