@@ -1,3 +1,5 @@
+<div align="right"><b>简体中文</b> | <a href="README.en.md">English</a></div>
+
 # dsh-relay-check
 
 **检测中转站给你的 DeepSeek 到底是满血还是野鸡。**
